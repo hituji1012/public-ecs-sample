@@ -1,0 +1,29 @@
+{
+  "project": {
+    "name": "ecs-webapp",
+    "stage": "dev",
+    "description": "ECS Fargate Web Application"
+  },
+  "domain": {
+    "name": "momonoki-udemy.com"
+  },
+  "stack": {
+    "vpc": {
+      "maxAzs": 2,
+      "natGateways": 0
+    },
+    "logs": {
+      "retentionDays": 7
+    },
+    "ecs": {
+      "clusterName": "web-app-cluster",
+      "cpu": 256,
+      "memoryLimitMiB": 512,
+      "desiredCount": 1,
+      "containerPort": 80
+    },
+    "alb": {
+      "port": 443
+    }
+  }
+}

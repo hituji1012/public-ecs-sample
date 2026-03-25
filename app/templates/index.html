@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ゲームサンプル</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100dvh;
+      font-family: sans-serif;
+      user-select: none;
+      overflow: hidden;
+    }
+    canvas {
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      cursor: pointer;
+      max-width: 100vw;
+      max-height: 90dvh;
+      touch-action: none;
+    }
+    #score-display {
+      color: #fff;
+      font-size: 0.9rem;
+      margin-top: 8px;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game" width="400" height="600"></canvas>
+  <div id="score-display">スペースキー / クリック / タップでジャンプ</div>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+
+    function resize() {
+      const maxW = 400;
+      const maxH = window.innerHeight * 0.88;
+      const aspect = 400 / 600;
+      let w = Math.min(maxW, window.innerWidth - 16);
+      let h = w / aspect;
+      if (h > maxH) { h = maxH; w = h * aspect; }
+      canvas.width = Math.floor(w);
+      canvas.height = Math.floor(h);
+    }
+    resize();
+    window.addEventListener('resize', () => { resize(); });
+
+    const W = 400;  // 論理サイズ（描画座標系）
+    const H = 600;
+
+    // canvas を論理サイズでスケーリング描画
+    function scaleCtx() {
+      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    }
+
+    // ゲーム定数
+    const GRAVITY = 0.45;
+    const JUMP_FORCE = -9;
+    const PIPE_WIDTH = 60;
+    const PIPE_GAP = 160;
+    const PIPE_SPEED = 2.8;
+    const PIPE_INTERVAL = 90; // フレーム数
+
+    // 状態
+    let state = 'idle'; // idle | playing | dead
+    let bird, pipes, score, bestScore, frameCount;
+
+    bestScore = 0;
+
+    function init() {
+      bird = { x: 100, y: H / 2, vy: 0, radius: 18 };
+      pipes = [];
+      score = 0;
+      frameCount = 0;
+      state = 'idle';
+    }
+
+    function jump() {
+      if (state === 'idle') {
+        state = 'playing';
+        bird.vy = JUMP_FORCE;
+      } else if (state === 'playing') {
+        bird.vy = JUMP_FORCE;
+      } else if (state === 'dead') {
+        init();
+      }
+    }
+
+    // 入力
+    document.addEventListener('keydown', e => {
+      if (e.code === 'Space') { e.preventDefault(); jump(); }
+    });
+    canvas.addEventListener('click', jump);
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); jump(); }, { passive: false });
+
+    function spawnPipe() {
+      const minY = 80;
+      const maxY = H - PIPE_GAP - 80;
+      const topH = Math.random() * (maxY - minY) + minY;
+      pipes.push({ x: W + PIPE_WIDTH, topH, passed: false });
+    }
+
+    function checkCollision() {
+      const { x, y, radius } = bird;
+
+      // 上下の壁
+      if (y - radius <= 0 || y + radius >= H) return true;
+
+      for (const p of pipes) {
+        const px = p.x, pw = PIPE_WIDTH;
+        const inX = x + radius > px && x - radius < px + pw;
+        if (inX) {
+          if (y - radius < p.topH || y + radius > p.topH + PIPE_GAP) return true;
+        }
+      }
+      return false;
+    }
+
+    // 空のグラデーション
+    function drawBackground() {
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, '#87CEEB');
+      grad.addColorStop(1, '#98D8C8');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+
+      // 雲（固定装飾）
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      drawCloud(60, 80, 40);
+      drawCloud(280, 130, 30);
+      drawCloud(160, 50, 25);
+    }
+
+    function drawCloud(x, y, r) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.arc(x + r * 0.8, y - r * 0.3, r * 0.7, 0, Math.PI * 2);
+      ctx.arc(x + r * 1.6, y, r * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 地面
+    function drawGround() {
+      ctx.fillStyle = '#5D4E37';
+      ctx.fillRect(0, H - 20, W, 20);
+      ctx.fillStyle = '#7CBA5E';
+      ctx.fillRect(0, H - 20, W, 6);
+    }
+
+    // パイプ
+    function drawPipe(p) {
+      const grad = ctx.createLinearGradient(p.x, 0, p.x + PIPE_WIDTH, 0);
+      grad.addColorStop(0, '#3a7d44');
+      grad.addColorStop(0.4, '#57b560');
+      grad.addColorStop(1, '#2d6236');
+      ctx.fillStyle = grad;
+
+      // 上パイプ
+      ctx.fillRect(p.x, 0, PIPE_WIDTH, p.topH);
+      // 上パイプのキャップ
+      ctx.fillRect(p.x - 4, p.topH - 22, PIPE_WIDTH + 8, 22);
+
+      // 下パイプ
+      const botY = p.topH + PIPE_GAP;
+      ctx.fillRect(p.x, botY, PIPE_WIDTH, H - botY);
+      // 下パイプのキャップ
+      ctx.fillRect(p.x - 4, botY, PIPE_WIDTH + 8, 22);
+
+      // ハイライト
+      ctx.fillStyle = 'rgba(255,255,255,0.15)';
+      ctx.fillRect(p.x + 6, 0, 8, p.topH);
+      ctx.fillRect(p.x + 6, botY + 22, 8, H - botY - 22);
+    }
+
+    // 鳥
+    function drawBird() {
+      const { x, y, vy } = bird;
+      const angle = Math.max(-25, Math.min(40, vy * 3));
+
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle * Math.PI / 180);
+
+      // 体
+      ctx.fillStyle = '#FFD700';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 18, 14, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 翼
+      ctx.fillStyle = '#FFA500';
+      ctx.beginPath();
+      ctx.ellipse(-6, 4 + Math.sin(frameCount * 0.3) * 3, 10, 6, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 目
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(8, -4, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#222';
+      ctx.beginPath();
+      ctx.arc(10, -4, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // くちばし
+      ctx.fillStyle = '#FF6600';
+      ctx.beginPath();
+      ctx.moveTo(16, 0);
+      ctx.lineTo(26, -3);
+      ctx.lineTo(26, 3);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // スコア
+    function drawScore() {
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.lineWidth = 3;
+      ctx.font = 'bold 48px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.strokeText(score, W / 2, 80);
+      ctx.fillText(score, W / 2, 80);
+    }
+
+    // 待機画面
+    function drawIdle() {
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 36px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🐦 ゲームサンプル', W / 2, H / 2 - 50);
+
+      ctx.font = '20px sans-serif';
+      ctx.fillStyle = '#ffe';
+      ctx.fillText('クリック / スペースで開始', W / 2, H / 2 + 10);
+
+      if (bestScore > 0) {
+        ctx.font = '16px sans-serif';
+        ctx.fillStyle = '#ffd700';
+        ctx.fillText(`ベストスコア: ${bestScore}`, W / 2, H / 2 + 50);
+      }
+    }
+
+    // ゲームオーバー
+    function drawDead() {
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.fillStyle = '#ff4444';
+      ctx.font = 'bold 42px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('GAME OVER', W / 2, H / 2 - 60);
+
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 28px sans-serif';
+      ctx.fillText(`スコア: ${score}`, W / 2, H / 2 - 10);
+
+      ctx.fillStyle = '#ffd700';
+      ctx.font = '20px sans-serif';
+      ctx.fillText(`ベスト: ${bestScore}`, W / 2, H / 2 + 30);
+
+      ctx.fillStyle = '#aef';
+      ctx.font = '18px sans-serif';
+      ctx.fillText('クリックで再挑戦', W / 2, H / 2 + 80);
+    }
+
+    function update() {
+      if (state !== 'playing') return;
+
+      frameCount++;
+
+      // 鳥の物理
+      bird.vy += GRAVITY;
+      bird.y += bird.vy;
+
+      // パイプ生成
+      if (frameCount % PIPE_INTERVAL === 0) spawnPipe();
+
+      // パイプ移動
+      for (const p of pipes) p.x -= PIPE_SPEED;
+
+      // スコア加算
+      for (const p of pipes) {
+        if (!p.passed && p.x + PIPE_WIDTH < bird.x) {
+          p.passed = true;
+          score++;
+          if (score > bestScore) bestScore = score;
+        }
+      }
+
+      // 画面外パイプ削除
+      pipes = pipes.filter(p => p.x + PIPE_WIDTH > 0);
+
+      // 衝突判定
+      if (checkCollision()) state = 'dead';
+    }
+
+    function render() {
+      scaleCtx();
+      drawBackground();
+      for (const p of pipes) drawPipe(p);
+      drawGround();
+      drawBird();
+      if (state === 'playing' || state === 'dead') drawScore();
+      if (state === 'idle') drawIdle();
+      if (state === 'dead') drawDead();
+    }
+
+    function loop() {
+      update();
+      render();
+      requestAnimationFrame(loop);
+    }
+
+    init();
+    loop();
+  </script>
+</body>
+</html>
