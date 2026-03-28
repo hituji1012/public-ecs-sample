@@ -1,3 +1,5 @@
 fastapi
 uvicorn[standard]
 jinja2
+openai
+boto3

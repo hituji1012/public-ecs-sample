@@ -37,6 +37,17 @@ export class EcsWebappStack extends cdk.Stack {
       ],
     });
 
+    // IAM - Task Role (コンテナが使用するロール)
+    const taskRole = new iam.Role(this, 'TaskRole', {
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+    });
+    taskRole.addToPolicy(new iam.PolicyStatement({
+      actions: ['secretsmanager:GetSecretValue'],
+      resources: [
+        `arn:aws:secretsmanager:${this.region}:${this.account}:secret:Azure_OpneAI_Hituji*`,
+      ],
+    }));
+
     // CloudWatch Logs
     const logGroup = new logs.LogGroup(this, 'LogGroup', {
       logGroupName: `/ecs/${project.name}-${project.stage}`,
@@ -60,6 +71,7 @@ export class EcsWebappStack extends cdk.Stack {
       cpu: stack.ecs.cpu,
       memoryLimitMiB: stack.ecs.memoryLimitMiB,
       executionRole,
+      taskRole,
     });
 
     taskDefinition.addContainer('AppContainer', {

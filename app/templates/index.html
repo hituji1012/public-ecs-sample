@@ -3,332 +3,521 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ゲームサンプル</title>
+  <title>マネージャー支援 AI</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      background: #1a1a2e;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f5f5;
+      height: 100dvh;
       display: flex;
       flex-direction: column;
-      justify-content: center;
+    }
+
+    header {
+      width: 100%;
+      background: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 14px 24px;
+      font-size: 18px;
+      font-weight: 600;
+      color: #1a1a1a;
+      display: flex;
       align-items: center;
-      height: 100dvh;
-      font-family: sans-serif;
-      user-select: none;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    header .skill-badge {
+      font-size: 13px;
+      font-weight: 500;
+      color: #4f46e5;
+      background: #eef2ff;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+
+    #menu-btn {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      color: #1a1a1a;
+      flex-shrink: 0;
+      margin-right: 4px;
+    }
+
+    #menu-btn svg { width: 22px; height: 22px; }
+
+    #sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.3);
+      z-index: 10;
+    }
+
+    #sidebar-overlay.visible { display: block; }
+
+    #main {
+      flex: 1;
+      display: flex;
       overflow: hidden;
     }
-    canvas {
-      border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+
+    /* ── Skill sidebar ── */
+    #skill-panel {
+      width: 240px;
+      flex-shrink: 0;
+      background: #fff;
+      border-right: 1px solid #e0e0e0;
+      overflow-y: auto;
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    @media (max-width: 640px) {
+      #menu-btn { display: flex; }
+
+      #skill-panel {
+        position: fixed;
+        top: 0;
+        left: -260px;
+        width: 260px;
+        height: 100dvh;
+        z-index: 20;
+        border-right: 1px solid #e0e0e0;
+        transition: left 0.25s ease;
+        padding-top: 20px;
+      }
+
+      #skill-panel.is-open { left: 0; }
+    }
+
+    .skill-category h3 {
+      font-size: 11px;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 0 8px;
+      margin-bottom: 6px;
+    }
+
+    .skill-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: none;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 10px;
       cursor: pointer;
-      max-width: 100vw;
-      max-height: 90dvh;
-      touch-action: none;
+      transition: background 0.15s;
     }
-    #score-display {
+
+    .skill-item:hover { background: #f3f4f6; }
+
+    .skill-item.active {
+      background: #eef2ff;
+    }
+
+    .skill-item .skill-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+
+    .skill-item.active .skill-name { color: #4f46e5; }
+
+    .skill-note {
+      font-size: 11px;
+      color: #aaa;
+      line-height: 1.6;
+      padding: 8px 10px;
+      border-top: 1px solid #f0f0f0;
+      margin-top: auto;
+    }
+
+    .skill-item .skill-desc {
+      font-size: 11px;
+      color: #888;
+      margin-top: 2px;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* ── Chat area ── */
+    #chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      align-items: center;
+    }
+
+    #chat-container {
+      flex: 1;
+      width: 100%;
+      max-width: 800px;
+      overflow-y: auto;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      display: flex;
+      gap: 12px;
+      max-width: 100%;
+    }
+
+    .message.user { flex-direction: row-reverse; }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .message.user .avatar  { background: #4f46e5; color: #fff; }
+    .message.assistant .avatar { background: #10a37f; color: #fff; }
+
+    .bubble {
+      padding: 12px 16px;
+      border-radius: 16px;
+      line-height: 1.6;
+      font-size: 15px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-width: calc(100% - 60px);
+    }
+
+    .message.user .bubble {
+      background: #4f46e5;
       color: #fff;
-      font-size: 0.9rem;
-      margin-top: 8px;
-      opacity: 0.6;
+      border-bottom-right-radius: 4px;
     }
+
+    .message.assistant .bubble {
+      background: #fff;
+      color: #1a1a1a;
+      border-bottom-left-radius: 4px;
+      border: 1px solid #e0e0e0;
+    }
+
+    .typing::after {
+      content: "▋";
+      animation: blink 0.7s step-start infinite;
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    #error-banner {
+      display: none;
+      background: #fee2e2;
+      color: #b91c1c;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      margin: 0 16px 8px;
+      max-width: 800px;
+      width: calc(100% - 32px);
+    }
+
+    #input-area {
+      width: 100%;
+      max-width: 800px;
+      padding: 12px 16px 20px;
+    }
+
+    #input-wrapper {
+      display: flex;
+      gap: 10px;
+      background: #fff;
+      border: 1px solid #d0d0d0;
+      border-radius: 16px;
+      padding: 10px 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      align-items: flex-end;
+    }
+
+    #user-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 15px;
+      resize: none;
+      max-height: 160px;
+      line-height: 1.5;
+      font-family: inherit;
+      background: transparent;
+    }
+
+    #send-btn {
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 50%;
+      background: #4f46e5;
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+
+    #send-btn:disabled { background: #c0bdf0; cursor: default; }
+    #send-btn:not(:disabled):hover { background: #4338ca; }
+    #send-btn svg { width: 18px; height: 18px; }
   </style>
 </head>
 <body>
-  <canvas id="game" width="400" height="600"></canvas>
-  <div id="score-display">スペースキー / クリック / タップでジャンプ</div>
+  <header>
+    <button id="menu-btn" title="スキルメニュー" aria-label="スキルメニューを開く">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <line x1="3" y1="12" x2="21" y2="12"/>
+        <line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+    <span>マネージャー支援 AI</span>
+    <span id="active-skill-badge" class="skill-badge"></span>
+  </header>
+
+  <div id="sidebar-overlay"></div>
+
+  <div id="main">
+    <aside id="skill-panel">
+      <!-- populated by JS -->
+      <div class="skill-note">
+        スキルを選ぶと、そのプロンプトが適用されます。<br>
+        ※ orchestrator は適切なスキルへの案内のみ行います。スキルの自動切り替えは行われません。
+      </div>
+    </aside>
+
+    <div id="chat-area">
+      <div id="chat-container"></div>
+      <div id="error-banner"></div>
+      <div id="input-area">
+        <div id="input-wrapper">
+          <textarea id="user-input" rows="1" placeholder="メッセージを入力…"></textarea>
+          <button id="send-btn" title="送信">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"/>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script>
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
+    const chatContainer = document.getElementById("chat-container");
+    const userInput = document.getElementById("user-input");
+    const sendBtn = document.getElementById("send-btn");
+    const errorBanner = document.getElementById("error-banner");
+    const skillPanel = document.getElementById("skill-panel");
+    const activeBadge = document.getElementById("active-skill-badge");
+    const menuBtn = document.getElementById("menu-btn");
+    const sidebarOverlay = document.getElementById("sidebar-overlay");
 
-    function resize() {
-      const maxW = 400;
-      const maxH = window.innerHeight * 0.88;
-      const aspect = 400 / 600;
-      let w = Math.min(maxW, window.innerWidth - 16);
-      let h = w / aspect;
-      if (h > maxH) { h = maxH; w = h * aspect; }
-      canvas.width = Math.floor(w);
-      canvas.height = Math.floor(h);
-    }
-    resize();
-    window.addEventListener('resize', () => { resize(); });
+    let history = [];
+    let activeSkill = "manager-orchestrator";
 
-    const W = 400;  // 論理サイズ（描画座標系）
-    const H = 600;
-
-    // canvas を論理サイズでスケーリング描画
-    function scaleCtx() {
-      ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    // ── Sidebar toggle (mobile) ──────────────────────────────
+    function openSidebar() {
+      skillPanel.classList.add("is-open");
+      sidebarOverlay.classList.add("visible");
     }
 
-    // ゲーム定数
-    const GRAVITY = 0.45;
-    const JUMP_FORCE = -9;
-    const PIPE_WIDTH = 60;
-    const PIPE_GAP = 160;
-    const PIPE_SPEED = 2.8;
-    const PIPE_INTERVAL = 90; // フレーム数
-
-    // 状態
-    let state = 'idle'; // idle | playing | dead
-    let bird, pipes, score, bestScore, frameCount;
-
-    bestScore = 0;
-
-    function init() {
-      bird = { x: 100, y: H / 2, vy: 0, radius: 18 };
-      pipes = [];
-      score = 0;
-      frameCount = 0;
-      state = 'idle';
+    function closeSidebar() {
+      skillPanel.classList.remove("is-open");
+      sidebarOverlay.classList.remove("visible");
     }
 
-    function jump() {
-      if (state === 'idle') {
-        state = 'playing';
-        bird.vy = JUMP_FORCE;
-      } else if (state === 'playing') {
-        bird.vy = JUMP_FORCE;
-      } else if (state === 'dead') {
-        init();
-      }
-    }
-
-    // 入力
-    document.addEventListener('keydown', e => {
-      if (e.code === 'Space') { e.preventDefault(); jump(); }
+    menuBtn.addEventListener("click", () => {
+      skillPanel.classList.contains("is-open") ? closeSidebar() : openSidebar();
     });
-    canvas.addEventListener('click', jump);
-    canvas.addEventListener('touchstart', e => { e.preventDefault(); jump(); }, { passive: false });
 
-    function spawnPipe() {
-      const minY = 80;
-      const maxY = H - PIPE_GAP - 80;
-      const topH = Math.random() * (maxY - minY) + minY;
-      pipes.push({ x: W + PIPE_WIDTH, topH, passed: false });
-    }
+    sidebarOverlay.addEventListener("click", closeSidebar);
 
-    function checkCollision() {
-      const { x, y, radius } = bird;
+    // ── Skill panel ──────────────────────────────────────────
+    async function loadSkills() {
+      const res = await fetch("/api/skills");
+      const skills = await res.json();
 
-      // 上下の壁
-      if (y - radius <= 0 || y + radius >= H) return true;
+      const byCategory = {};
+      for (const s of skills) {
+        if (!byCategory[s.category]) byCategory[s.category] = { label: s.categoryLabel, items: [] };
+        byCategory[s.category].items.push(s);
+      }
 
-      for (const p of pipes) {
-        const px = p.x, pw = PIPE_WIDTH;
-        const inX = x + radius > px && x - radius < px + pw;
-        if (inX) {
-          if (y - radius < p.topH || y + radius > p.topH + PIPE_GAP) return true;
+      for (const [, group] of Object.entries(byCategory)) {
+        const section = document.createElement("div");
+        section.className = "skill-category";
+
+        const h3 = document.createElement("h3");
+        h3.textContent = group.label;
+        section.appendChild(h3);
+
+        for (const skill of group.items) {
+          const btn = document.createElement("button");
+          btn.className = "skill-item" + (skill.id === activeSkill ? " active" : "");
+          btn.dataset.skillId = skill.id;
+          btn.dataset.skillName = skill.name;
+
+          const nameEl = document.createElement("div");
+          nameEl.className = "skill-name";
+          nameEl.textContent = skill.name;
+
+          const descEl = document.createElement("div");
+          descEl.className = "skill-desc";
+          descEl.textContent = skill.description;
+
+          btn.appendChild(nameEl);
+          btn.appendChild(descEl);
+          btn.addEventListener("click", () => { selectSkill(skill.id, skill.name); closeSidebar(); });
+          section.appendChild(btn);
         }
+
+        skillPanel.insertBefore(section, skillPanel.querySelector(".skill-note"));
       }
-      return false;
+
+      // Set initial badge
+      const initial = skills.find(s => s.id === activeSkill);
+      if (initial) activeBadge.textContent = initial.name;
     }
 
-    // 空のグラデーション
-    function drawBackground() {
-      const grad = ctx.createLinearGradient(0, 0, 0, H);
-      grad.addColorStop(0, '#87CEEB');
-      grad.addColorStop(1, '#98D8C8');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, W, H);
+    function selectSkill(skillId, skillName) {
+      if (skillId === activeSkill) return;
+      activeSkill = skillId;
+      activeBadge.textContent = skillName;
 
-      // 雲（固定装飾）
-      ctx.fillStyle = 'rgba(255,255,255,0.7)';
-      drawCloud(60, 80, 40);
-      drawCloud(280, 130, 30);
-      drawCloud(160, 50, 25);
+      // Update active state
+      document.querySelectorAll(".skill-item").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.skillId === skillId);
+      });
+
+      // Reset conversation
+      history = [];
+      chatContainer.innerHTML = "";
     }
 
-    function drawCloud(x, y, r) {
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.arc(x + r * 0.8, y - r * 0.3, r * 0.7, 0, Math.PI * 2);
-      ctx.arc(x + r * 1.6, y, r * 0.8, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // ── Chat ─────────────────────────────────────────────────
+    userInput.addEventListener("input", () => {
+      userInput.style.height = "auto";
+      userInput.style.height = Math.min(userInput.scrollHeight, 160) + "px";
+    });
 
-    // 地面
-    function drawGround() {
-      ctx.fillStyle = '#5D4E37';
-      ctx.fillRect(0, H - 20, W, 20);
-      ctx.fillStyle = '#7CBA5E';
-      ctx.fillRect(0, H - 20, W, 6);
-    }
-
-    // パイプ
-    function drawPipe(p) {
-      const grad = ctx.createLinearGradient(p.x, 0, p.x + PIPE_WIDTH, 0);
-      grad.addColorStop(0, '#3a7d44');
-      grad.addColorStop(0.4, '#57b560');
-      grad.addColorStop(1, '#2d6236');
-      ctx.fillStyle = grad;
-
-      // 上パイプ
-      ctx.fillRect(p.x, 0, PIPE_WIDTH, p.topH);
-      // 上パイプのキャップ
-      ctx.fillRect(p.x - 4, p.topH - 22, PIPE_WIDTH + 8, 22);
-
-      // 下パイプ
-      const botY = p.topH + PIPE_GAP;
-      ctx.fillRect(p.x, botY, PIPE_WIDTH, H - botY);
-      // 下パイプのキャップ
-      ctx.fillRect(p.x - 4, botY, PIPE_WIDTH + 8, 22);
-
-      // ハイライト
-      ctx.fillStyle = 'rgba(255,255,255,0.15)';
-      ctx.fillRect(p.x + 6, 0, 8, p.topH);
-      ctx.fillRect(p.x + 6, botY + 22, 8, H - botY - 22);
-    }
-
-    // 鳥
-    function drawBird() {
-      const { x, y, vy } = bird;
-      const angle = Math.max(-25, Math.min(40, vy * 3));
-
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(angle * Math.PI / 180);
-
-      // 体
-      ctx.fillStyle = '#FFD700';
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 18, 14, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 翼
-      ctx.fillStyle = '#FFA500';
-      ctx.beginPath();
-      ctx.ellipse(-6, 4 + Math.sin(frameCount * 0.3) * 3, 10, 6, -0.3, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 目
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.arc(8, -4, 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#222';
-      ctx.beginPath();
-      ctx.arc(10, -4, 3, 0, Math.PI * 2);
-      ctx.fill();
-
-      // くちばし
-      ctx.fillStyle = '#FF6600';
-      ctx.beginPath();
-      ctx.moveTo(16, 0);
-      ctx.lineTo(26, -3);
-      ctx.lineTo(26, 3);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.restore();
-    }
-
-    // スコア
-    function drawScore() {
-      ctx.fillStyle = '#fff';
-      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-      ctx.lineWidth = 3;
-      ctx.font = 'bold 48px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.strokeText(score, W / 2, 80);
-      ctx.fillText(score, W / 2, 80);
-    }
-
-    // 待機画面
-    function drawIdle() {
-      ctx.fillStyle = 'rgba(0,0,0,0.35)';
-      ctx.fillRect(0, 0, W, H);
-
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 36px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('🐦 ゲームサンプル', W / 2, H / 2 - 50);
-
-      ctx.font = '20px sans-serif';
-      ctx.fillStyle = '#ffe';
-      ctx.fillText('クリック / スペースで開始', W / 2, H / 2 + 10);
-
-      if (bestScore > 0) {
-        ctx.font = '16px sans-serif';
-        ctx.fillStyle = '#ffd700';
-        ctx.fillText(`ベストスコア: ${bestScore}`, W / 2, H / 2 + 50);
+    userInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        sendMessage();
+        setTimeout(() => {
+          userInput.value = "";
+          userInput.style.height = "auto";
+        }, 0);
       }
+    });
+
+    sendBtn.addEventListener("click", sendMessage);
+
+    function addMessage(role, text, typing = false) {
+      const wrap = document.createElement("div");
+      wrap.className = `message ${role}`;
+
+      const avatar = document.createElement("div");
+      avatar.className = "avatar";
+      avatar.textContent = role === "user" ? "You" : "AI";
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble" + (typing ? " typing" : "");
+      bubble.textContent = text;
+
+      wrap.appendChild(avatar);
+      wrap.appendChild(bubble);
+      chatContainer.appendChild(wrap);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+      return bubble;
     }
 
-    // ゲームオーバー
-    function drawDead() {
-      ctx.fillStyle = 'rgba(0,0,0,0.45)';
-      ctx.fillRect(0, 0, W, H);
-
-      ctx.fillStyle = '#ff4444';
-      ctx.font = 'bold 42px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('GAME OVER', W / 2, H / 2 - 60);
-
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 28px sans-serif';
-      ctx.fillText(`スコア: ${score}`, W / 2, H / 2 - 10);
-
-      ctx.fillStyle = '#ffd700';
-      ctx.font = '20px sans-serif';
-      ctx.fillText(`ベスト: ${bestScore}`, W / 2, H / 2 + 30);
-
-      ctx.fillStyle = '#aef';
-      ctx.font = '18px sans-serif';
-      ctx.fillText('クリックで再挑戦', W / 2, H / 2 + 80);
+    function showError(msg) {
+      errorBanner.textContent = msg;
+      errorBanner.style.display = "block";
+      setTimeout(() => { errorBanner.style.display = "none"; }, 5000);
     }
 
-    function update() {
-      if (state !== 'playing') return;
+    async function sendMessage() {
+      const text = userInput.value.trim();
+      if (!text) return;
 
-      frameCount++;
+      errorBanner.style.display = "none";
+      userInput.value = "";
+      userInput.style.height = "auto";
+      sendBtn.disabled = true;
 
-      // 鳥の物理
-      bird.vy += GRAVITY;
-      bird.y += bird.vy;
+      addMessage("user", text);
+      history.push({ role: "user", content: text });
 
-      // パイプ生成
-      if (frameCount % PIPE_INTERVAL === 0) spawnPipe();
+      const aiBubble = addMessage("assistant", "", true);
 
-      // パイプ移動
-      for (const p of pipes) p.x -= PIPE_SPEED;
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: history, skill: activeSkill }),
+        });
 
-      // スコア加算
-      for (const p of pipes) {
-        if (!p.passed && p.x + PIPE_WIDTH < bird.x) {
-          p.passed = true;
-          score++;
-          if (score > bestScore) bestScore = score;
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(errText || `HTTP ${res.status}`);
         }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let reply = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          reply += chunk;
+          aiBubble.classList.remove("typing");
+          aiBubble.textContent = reply;
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        aiBubble.classList.remove("typing");
+        history.push({ role: "assistant", content: reply });
+      } catch (err) {
+        aiBubble.classList.remove("typing");
+        aiBubble.textContent = "エラーが発生しました。";
+        showError(err.message);
+      } finally {
+        sendBtn.disabled = false;
+        userInput.focus();
       }
-
-      // 画面外パイプ削除
-      pipes = pipes.filter(p => p.x + PIPE_WIDTH > 0);
-
-      // 衝突判定
-      if (checkCollision()) state = 'dead';
     }
 
-    function render() {
-      scaleCtx();
-      drawBackground();
-      for (const p of pipes) drawPipe(p);
-      drawGround();
-      drawBird();
-      if (state === 'playing' || state === 'dead') drawScore();
-      if (state === 'idle') drawIdle();
-      if (state === 'dead') drawDead();
-    }
-
-    function loop() {
-      update();
-      render();
-      requestAnimationFrame(loop);
-    }
-
-    init();
-    loop();
+    loadSkills();
   </script>
 </body>
 </html>

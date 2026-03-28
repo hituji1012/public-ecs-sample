@@ -7,3 +7,16 @@ node_modules
 .cdk.staging
 cdk.out
 cdk.context.json
+
+# ローカル環境設定（シークレットを含む可能性があるためgit管理外）
+.env.local
+
+# Claude Code設定（ローカルパスが含まれるためgit管理外）
+.claude/
+
+# Python
+app/.venv/
+app/__pycache__/
+
+# macOS
+.DS_Store

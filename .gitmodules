@@ -1,0 +1,3 @@
+[submodule "app/dept-skill"]
+	path = app/dept-skill
+	url = https://github.com/hituji1012/dept-skill

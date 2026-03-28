@@ -1,0 +1,19 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/app/.venv/bin/python",
+  "python.analysis.extraPaths": ["${workspaceFolder}/app"],
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "isort.args": ["--profile", "black"],
+  "editor.rulers": [88],
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "node_modules": true,
+    "cdk.out": true
+  }
+}

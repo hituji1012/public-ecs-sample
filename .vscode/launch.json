@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "FastAPI (uvicorn)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"],
+      "cwd": "${workspaceFolder}/app",
+      "envFile": "${workspaceFolder}/.env.local",
+      "python": "${workspaceFolder}/app/.venv/bin/python",
+      "jinja": true
+    }
+  ]
+}
